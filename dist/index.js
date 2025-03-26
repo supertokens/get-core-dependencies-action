@@ -27274,12 +27274,16 @@ async function run() {
                 const { stdout: branchesOutput } = await execAsync('git for-each-ref --format="%(refname:short)" refs/remotes/origin/', { cwd: tempDir });
                 const remoteBranches = branchesOutput
                     .split('\n')
-                    .map((b) => b.trim().replace('origin/', ''))
+                    .map((b) => b.trim())
+                    // Don't replace 'origin/' here since for-each-ref already gives clean names
                     .filter((b) => b !== '' && b !== 'HEAD' && !b.includes('->'));
                 // Sort branches by commit date
                 const branchDates = await Promise.all(remoteBranches.map(async (branch) => {
-                    const { stdout } = await execAsync(`git show -s --format=%ct refs/remotes/origin/${branch}`, { cwd: tempDir });
-                    return { branch, timestamp: parseInt(stdout.trim()) };
+                    const { stdout } = await execAsync(`git show -s --format=%ct ${branch}`, { cwd: tempDir });
+                    return {
+                        branch: branch.replace('origin/', ''), // Clean branch name for later use
+                        timestamp: parseInt(stdout.trim())
+                    };
                 }));
                 branchDates.sort((a, b) => b.timestamp - a.timestamp);
                 for (const { branch } of branchDates) {

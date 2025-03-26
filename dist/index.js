@@ -30780,7 +30780,7 @@ var Octokit = Octokit$1.plugin(
 async function run() {
     try {
         const runningFor = coreExports.getInput('running-for');
-        const commonFile = await fs.readFile('supportedVersions.json', 'utf-8');
+        const commonFile = await fs.readFile('pluginInterfaceSupported.json', 'utf-8');
         const pluginVersions = JSON.parse(commonFile);
         const pluginVersion = pluginVersions.version[0];
         const branches = {};

@@ -11,7 +11,10 @@ export async function run(): Promise<void> {
   try {
     const runningFor: string = core.getInput('running-for')
 
-    const commonFile = await fs.readFile('supportedVersions.json', 'utf-8')
+    const commonFile = await fs.readFile(
+      'pluginInterfaceSupported.json',
+      'utf-8'
+    )
     const pluginVersions = JSON.parse(commonFile)
     const pluginVersion = pluginVersions.version[0]
 

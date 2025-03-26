@@ -52,7 +52,8 @@ export async function run(): Promise<void> {
         const branchDates = await Promise.all(
           remoteBranches.map(async (branch) => {
             const { stdout } = await execAsync(
-              `git log -1 --format=%ct origin/${branch}`,
+              // Remove the extra 'origin/' since branch already includes it
+              `git log -1 --format=%ct ${branch}`,
               { cwd: tempDir }
             )
             return {

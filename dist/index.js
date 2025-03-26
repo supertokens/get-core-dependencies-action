@@ -27254,12 +27254,12 @@ var coreExports = requireCore();
 async function run() {
     try {
         // const pluginVersion: string = core.getInput('plugin-version')
-        coreExports.setOutput('branches', {
+        coreExports.setOutput('branches', JSON.stringify({
             'plugin-interface': '7.1',
             postgresql: 'fix/test-speed',
             mysql: '8.1',
             mongodb: '1.31'
-        });
+        }));
     }
     catch (error) {
         // Fail the workflow run if an error occurs

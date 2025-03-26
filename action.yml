@@ -16,20 +16,6 @@ inputs:
 outputs:
   branches:
     description: Core dependency branches
-    type: object
-    properties:
-      plugin-interface:
-        description: Core dependency branch of plugin-interface
-        type: string
-      postgresql:
-        description: Core dependency branch of postgresql plugin
-        type: string
-      mysql:
-        description: Core dependency branch of mysql plugin
-        type: string
-      mongodb:
-        description: Core dependency branch of mongodb plugin
-        type: string
 
 runs:
   using: node20

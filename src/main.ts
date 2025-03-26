@@ -1,4 +1,6 @@
 import * as core from '@actions/core'
+import { Octokit } from '@octokit/rest'
+import * as fs from 'fs/promises'
 
 /**
  * The main function for the action.
@@ -7,17 +9,68 @@ import * as core from '@actions/core'
  */
 export async function run(): Promise<void> {
   try {
-    // const pluginVersion: string = core.getInput('plugin-version')
+    const runningFor: string = core.getInput('running-for')
 
-    core.setOutput(
-      'branches',
-      JSON.stringify({
-        'plugin-interface': '7.1',
-        postgresql: 'fix/test-speed',
-        mysql: '8.1',
-        mongodb: '1.31'
-      })
-    )
+    const commonFile = await fs.readFile('supportedVersions.json', 'utf-8')
+    const pluginVersions = JSON.parse(commonFile)
+    const pluginVersion = pluginVersions.version[0]
+
+    const branches: Record<string, string> = {}
+    const octokit = new Octokit()
+
+    if (runningFor === 'core') {
+      const plugins = ['postgresql', 'mysql', 'mongodb']
+      for (const plugin of plugins) {
+        console.log(`Getting branches for ${plugin}`)
+
+        const { data: branchData } = await octokit.repos.listBranches({
+          owner: 'supertokens',
+          repo: `supertokens-${plugin}-plugin`,
+          sort: 'updated',
+          direction: 'desc'
+        })
+
+        for (const branch of branchData) {
+          console.log(`Checking branch ${branch.name}`)
+          try {
+            // Get pluginInterfaceSupported.json content
+            const { data: fileData } = await octokit.repos.getContent({
+              owner: 'supertokens',
+              repo: `supertokens-${plugin}-plugin`,
+              path: 'pluginInterfaceSupported.json',
+              ref: branch.name
+            })
+
+            if (Array.isArray(fileData)) {
+              console.log(`${branch.name} returned multiple files`)
+              continue
+            }
+
+            if (fileData.type !== 'file') {
+              console.log(`${branch.name} is not a file`)
+              continue
+            }
+
+            const content = Buffer.from(fileData.content, 'base64').toString()
+            const { versions } = JSON.parse(content)
+
+            if (versions[0] === pluginVersion) {
+              branches[plugin] = branch.name
+              break
+            }
+          } catch (e) {
+            // Skip if file not found or other errors
+            continue
+          }
+        }
+      }
+
+      console.log(branches)
+
+      core.setOutput('branches', JSON.stringify(branches))
+    } else {
+      core.setOutput('branches', JSON.stringify({}))
+    }
   } catch (error) {
     // Fail the workflow run if an error occurs
     if (error instanceof Error) core.setFailed(error.message)

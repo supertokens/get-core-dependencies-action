@@ -9,8 +9,8 @@ branding:
   color: red
 
 inputs:
-  plugin-version:
-    description: Plugin version
+  running-for:
+    description: core or plugin name
     required: true
 
 outputs:

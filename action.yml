@@ -1,23 +1,35 @@
-name: The name of your action here
-description: Provide a description here
-author: Your name or organization here
+name: Get core dependency branches
+description:
+  Find core dependency branches of plugin-interface and plugins based on plugin
+  version
+author: SuperTokens
 
-# Add your action's branding here. This will appear on the GitHub Marketplace.
 branding:
   icon: heart
   color: red
 
-# Define your inputs here.
 inputs:
-  milliseconds:
-    description: Your input description here
+  plugin-version:
+    description: Plugin version
     required: true
-    default: '1000'
 
-# Define your outputs here.
 outputs:
-  time:
-    description: Your output description here
+  branches:
+    description: Core dependency branches
+    type: object
+    properties:
+      plugin-interface:
+        description: Core dependency branch of plugin-interface
+        type: string
+      postgresql:
+        description: Core dependency branch of postgresql plugin
+        type: string
+      mysql:
+        description: Core dependency branch of mysql plugin
+        type: string
+      mongodb:
+        description: Core dependency branch of mongodb plugin
+        type: string
 
 runs:
   using: node20

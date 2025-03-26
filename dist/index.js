@@ -27288,6 +27288,7 @@ async function run() {
                     };
                 }));
                 branchDates.sort((a, b) => b.timestamp - a.timestamp);
+                console.log(branchDates);
                 for (const { branch } of branchDates) {
                     console.log(`Checking branch ${branch}`);
                     try {

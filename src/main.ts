@@ -65,6 +65,8 @@ export async function run(): Promise<void> {
 
         branchDates.sort((a, b) => b.timestamp - a.timestamp)
 
+        console.log(branchDates)
+
         for (const { branch } of branchDates) {
           console.log(`Checking branch ${branch}`)
           try {

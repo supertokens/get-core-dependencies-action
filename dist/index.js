@@ -30795,6 +30795,7 @@ async function run() {
                     sort: 'updated',
                     direction: 'desc'
                 });
+                console.log(branchData);
                 for (const branch of branchData) {
                     console.log(`Checking branch ${branch.name}`);
                     try {

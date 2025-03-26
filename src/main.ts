@@ -34,20 +34,24 @@ export async function run(): Promise<void> {
         // Clone the repository
         await execAsync(`git clone ${repoUrl} ${tempDir}`)
 
-        // Get all branches
-        const { stdout: branchesOutput } = await execAsync('git branch -r', {
-          cwd: tempDir
-        })
+        // Fetch all remote branches
+        await execAsync('git fetch --all', { cwd: tempDir })
+
+        // Get all branches (excluding HEAD and other special refs)
+        const { stdout: branchesOutput } = await execAsync(
+          'git for-each-ref --format="%(refname:short)" refs/remotes/origin/',
+          { cwd: tempDir }
+        )
         const remoteBranches = branchesOutput
           .split('\n')
           .map((b) => b.trim().replace('origin/', ''))
-          .filter((b) => b !== '')
+          .filter((b) => b !== '' && b !== 'HEAD' && !b.includes('->'))
 
         // Sort branches by commit date
         const branchDates = await Promise.all(
           remoteBranches.map(async (branch) => {
             const { stdout } = await execAsync(
-              `git log -1 --format=%ct origin/${branch}`,
+              `git show -s --format=%ct refs/remotes/origin/${branch}`,
               { cwd: tempDir }
             )
             return { branch, timestamp: parseInt(stdout.trim()) }

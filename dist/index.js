@@ -30791,12 +30791,26 @@ async function run() {
                 console.log(`Getting branches for ${plugin}`);
                 const { data: branchData } = await octokit.repos.listBranches({
                     owner: 'supertokens',
-                    repo: `supertokens-${plugin}-plugin`,
-                    sort: 'updated',
-                    direction: 'desc'
+                    repo: `supertokens-${plugin}-plugin`
                 });
-                console.log(branchData);
-                for (const branch of branchData) {
+                // Sort branches by their last commit date in descending order
+                const sortedBranches = await Promise.all(branchData.map(async (branch) => {
+                    const { data: branchInfo } = await octokit.repos.getBranch({
+                        owner: 'supertokens',
+                        repo: `supertokens-${plugin}-plugin`,
+                        branch: branch.name
+                    });
+                    return {
+                        name: branch.name,
+                        date: new Date(branchInfo.commit.commit.author?.date ?? '')
+                    };
+                }));
+                sortedBranches.sort((a, b) => b.date.getTime() - a.date.getTime());
+                const sortedBranchData = sortedBranches.map((branch) => ({
+                    name: branch.name
+                }));
+                console.log(sortedBranchData);
+                for (const branch of sortedBranchData) {
                     console.log(`Checking branch ${branch.name}`);
                     try {
                         // Get pluginInterfaceSupported.json content

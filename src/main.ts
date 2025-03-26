@@ -1,6 +1,9 @@
 import * as core from '@actions/core'
-import { Octokit } from '@octokit/rest'
 import * as fs from 'fs/promises'
+import { exec } from 'child_process'
+import { promisify } from 'util'
+
+const execAsync = promisify(exec)
 
 /**
  * The main function for the action.
@@ -19,66 +22,55 @@ export async function run(): Promise<void> {
     const pluginVersion = pluginVersions.versions[0]
 
     const branches: Record<string, string> = {}
-    const octokit = new Octokit()
 
     if (runningFor === 'core') {
       const plugins = ['postgresql', 'mysql', 'mongodb']
+
       for (const plugin of plugins) {
-        console.log(`Getting branches for ${plugin}`)
+        console.log(`Processing ${plugin}`)
+        const repoUrl = `https://github.com/supertokens/supertokens-${plugin}-plugin.git`
+        const tempDir = `./temp-${plugin}`
 
-        const { data: branchData } = await octokit.repos.listBranches({
-          owner: 'supertokens',
-          repo: `supertokens-${plugin}-plugin`
+        // Clone the repository
+        await execAsync(`git clone ${repoUrl} ${tempDir}`)
+
+        // Get all branches
+        const { stdout: branchesOutput } = await execAsync('git branch -r', {
+          cwd: tempDir
         })
+        const remoteBranches = branchesOutput
+          .split('\n')
+          .map((b) => b.trim().replace('origin/', ''))
+          .filter((b) => b !== '')
 
-        // Sort branches by their last commit date in descending order
-        const sortedBranches = await Promise.all(
-          branchData.map(async (branch) => {
-            const { data: branchInfo } = await octokit.repos.getBranch({
-              owner: 'supertokens',
-              repo: `supertokens-${plugin}-plugin`,
-              branch: branch.name
-            })
-            return {
-              name: branch.name,
-              date: new Date(branchInfo.commit.commit.author?.date ?? '')
-            }
+        // Sort branches by commit date
+        const branchDates = await Promise.all(
+          remoteBranches.map(async (branch) => {
+            const { stdout } = await execAsync(
+              `git log -1 --format=%ct origin/${branch}`,
+              { cwd: tempDir }
+            )
+            return { branch, timestamp: parseInt(stdout.trim()) }
           })
         )
 
-        sortedBranches.sort((a, b) => b.date.getTime() - a.date.getTime())
-        const sortedBranchData = sortedBranches.map((branch) => ({
-          name: branch.name
-        }))
+        branchDates.sort((a, b) => b.timestamp - a.timestamp)
 
-        console.log(sortedBranchData)
-
-        for (const branch of sortedBranchData) {
-          console.log(`Checking branch ${branch.name}`)
+        for (const { branch } of branchDates) {
+          console.log(`Checking branch ${branch}`)
           try {
-            // Get pluginInterfaceSupported.json content
-            const { data: fileData } = await octokit.repos.getContent({
-              owner: 'supertokens',
-              repo: `supertokens-${plugin}-plugin`,
-              path: 'pluginInterfaceSupported.json',
-              ref: branch.name
-            })
+            // Checkout the branch
+            await execAsync(`git checkout origin/${branch}`, { cwd: tempDir })
 
-            if (Array.isArray(fileData)) {
-              console.log(`${branch.name} returned multiple files`)
-              continue
-            }
-
-            if (fileData.type !== 'file') {
-              console.log(`${branch.name} is not a file`)
-              continue
-            }
-
-            const content = Buffer.from(fileData.content, 'base64').toString()
+            // Read and parse pluginInterfaceSupported.json
+            const content = await fs.readFile(
+              `${tempDir}/pluginInterfaceSupported.json`,
+              'utf-8'
+            )
             const { versions } = JSON.parse(content)
 
             if (versions[0] === pluginVersion) {
-              branches[plugin] = branch.name
+              branches[plugin] = branch
               break
             }
           } catch (e) {
@@ -86,10 +78,12 @@ export async function run(): Promise<void> {
             continue
           }
         }
+
+        // Cleanup: Remove the temporary directory
+        await fs.rm(tempDir, { recursive: true, force: true })
       }
 
       console.log(branches)
-
       core.setOutput('branches', JSON.stringify(branches))
     } else {
       core.setOutput('branches', JSON.stringify({}))

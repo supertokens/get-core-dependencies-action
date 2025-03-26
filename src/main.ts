@@ -94,6 +94,81 @@ export async function run(): Promise<void> {
         await fs.rm(tempDir, { recursive: true, force: true })
       }
 
+      const pluginInterfaceRepo = `https://github.com/supertokens/supertokens-plugin-interface.git`
+      // Clone plugin-interface repo
+      const pluginInterfaceTempDir = await fs.mkdtemp(
+        path.join(os.tmpdir(), 'plugin-interface-')
+      )
+      await execAsync(
+        `git clone ${pluginInterfaceRepo} ${pluginInterfaceTempDir}`
+      )
+
+      // Get remote branches
+      const { stdout: pluginInterfaceBranches } = await execAsync(
+        'git for-each-ref --format="%(refname:short)" refs/remotes/origin/',
+        { cwd: pluginInterfaceTempDir }
+      )
+
+      const pluginInterfaceRemoteBranches = pluginInterfaceBranches
+        .split('\n')
+        .filter((b) => b !== '' && b !== 'HEAD' && !b.includes('->'))
+
+      // Sort branches by commit date
+      const pluginInterfaceBranchDates = await Promise.all(
+        pluginInterfaceRemoteBranches.map(async (branch) => {
+          const { stdout } = await execAsync(
+            `git log -1 --format=%ct ${branch}`,
+            { cwd: pluginInterfaceTempDir }
+          )
+          return {
+            branch: branch.replace('origin/', ''),
+            timestamp: parseInt(stdout.trim())
+          }
+        })
+      )
+
+      pluginInterfaceBranchDates.sort((a, b) => b.timestamp - a.timestamp)
+
+      console.log(pluginInterfaceBranchDates)
+
+      for (const { branch } of pluginInterfaceBranchDates) {
+        console.log(`Checking plugin-interface branch ${branch}`)
+        try {
+          // Checkout the branch
+          await execAsync(`git checkout origin/${branch}`, {
+            cwd: pluginInterfaceTempDir
+          })
+
+          // Read build.gradle and extract version
+          const content = await fs.readFile(
+            `${pluginInterfaceTempDir}/build.gradle`,
+            'utf-8'
+          )
+          const versionMatch = content.match(
+            /version\s*=\s*['"](\d+\.\d+)\.\d+['"]/
+          )
+
+          if (versionMatch) {
+            const branchVersion = versionMatch[1] // Gets the X.Y part from X.Y.Z
+            const pluginMajorMinor = pluginVersion
+              .split('.')
+              .slice(0, 2)
+              .join('.')
+
+            if (branchVersion === pluginMajorMinor) {
+              branches['plugin-interface'] = branch
+              break
+            }
+          }
+        } catch (e) {
+          // Skip if file not found or other errors
+          continue
+        }
+      }
+
+      // Cleanup: Remove the temporary directory
+      await fs.rm(pluginInterfaceTempDir, { recursive: true, force: true })
+
       console.log(branches)
       core.setOutput('branches', JSON.stringify(branches))
     } else {

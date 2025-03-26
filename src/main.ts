@@ -67,10 +67,9 @@ export async function run(): Promise<void> {
 
         branchDates.sort((a, b) => b.timestamp - a.timestamp)
 
-        console.log(branchDates)
+        console.log(branchDates.slice(0, 5))
 
         for (const { branch } of branchDates) {
-          console.log(`Checking branch ${branch}`)
           try {
             // Checkout the branch
             await execAsync(`git checkout origin/${branch}`, { cwd: tempDir })
@@ -131,10 +130,9 @@ export async function run(): Promise<void> {
 
       pluginInterfaceBranchDates.sort((a, b) => b.timestamp - a.timestamp)
 
-      console.log(pluginInterfaceBranchDates)
+      console.log(pluginInterfaceBranchDates.slice(0, 5))
 
       for (const { branch } of pluginInterfaceBranchDates) {
-        console.log(`Checking plugin-interface branch ${branch}`)
         try {
           // Checkout the branch
           await execAsync(`git checkout origin/${branch}`, {

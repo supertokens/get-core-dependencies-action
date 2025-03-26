@@ -27279,7 +27279,7 @@ async function run() {
                     .filter((b) => b !== '' && b !== 'HEAD' && !b.includes('->'));
                 // Sort branches by commit date
                 const branchDates = await Promise.all(remoteBranches.map(async (branch) => {
-                    const { stdout } = await execAsync(`git show -s --format=%ct ${branch}`, { cwd: tempDir });
+                    const { stdout } = await execAsync(`git log -1 --format=%ct origin/${branch}`, { cwd: tempDir });
                     return {
                         branch: branch.replace('origin/', ''), // Clean branch name for later use
                         timestamp: parseInt(stdout.trim())

@@ -30782,7 +30782,7 @@ async function run() {
         const runningFor = coreExports.getInput('running-for');
         const commonFile = await fs.readFile('pluginInterfaceSupported.json', 'utf-8');
         const pluginVersions = JSON.parse(commonFile);
-        const pluginVersion = pluginVersions.version[0];
+        const pluginVersion = pluginVersions.versions[0];
         const branches = {};
         const octokit = new Octokit();
         if (runningFor === 'core') {

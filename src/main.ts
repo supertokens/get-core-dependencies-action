@@ -16,7 +16,7 @@ export async function run(): Promise<void> {
       'utf-8'
     )
     const pluginVersions = JSON.parse(commonFile)
-    const pluginVersion = pluginVersions.version[0]
+    const pluginVersion = pluginVersions.versions[0]
 
     const branches: Record<string, string> = {}
     const octokit = new Octokit()

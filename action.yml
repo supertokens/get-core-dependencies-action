@@ -8,11 +8,6 @@ branding:
   icon: heart
   color: red
 
-inputs:
-  running-for:
-    description: core or plugin name
-    required: true
-
 outputs:
   branches:
     description: Core dependency branches

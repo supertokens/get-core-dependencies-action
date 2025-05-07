@@ -27247,17 +27247,93 @@ function requireCore () {
 
 var coreExports = requireCore();
 
-const execAsync = promisify(exec$1);
+const execAsync$1 = promisify(exec$1);
+const PLUGINS = [
+    'postgresql'
+    // not supporting anymore
+    // 'mysql',
+    // 'mongodb'
+];
 async function getPluginInterfaceVersion() {
     const commonFile = await fs.readFile('pluginInterfaceSupported.json', 'utf-8');
     const pluginVersions = JSON.parse(commonFile);
     return pluginVersions.versions[0];
 }
-const PLUGINS = ['postgresql', 'mysql', 'mongodb'];
 async function getBranchForPlugin(plugin, pluginInterfaceVersion, xyBranchesOnly) {
     console.log(`Processing ${plugin}`);
     const repoUrl = `https://github.com/supertokens/supertokens-${plugin}-plugin.git`;
     const tempDir = `./temp-${plugin}`;
+    // Clone the repository
+    await execAsync$1(`git clone ${repoUrl} ${tempDir}`);
+    // Fetch all remote branches
+    await execAsync$1('git fetch --all', { cwd: tempDir });
+    // Get all branches (excluding HEAD and other special refs)
+    const { stdout: branchesOutput } = await execAsync$1('git for-each-ref --format="%(refname:short)" refs/remotes/origin/', { cwd: tempDir });
+    const remoteBranches = branchesOutput
+        .split('\n')
+        .map((b) => b.trim())
+        // Don't replace 'origin/' here since for-each-ref already gives clean names
+        .filter((b) => b !== '' && b !== 'HEAD' && !b.includes('->'));
+    // Sort branches by commit date
+    const branchDates = await Promise.all(remoteBranches.map(async (branch) => {
+        const { stdout } = await execAsync$1(
+        // Remove the extra 'origin/' since branch already includes it
+        `git log -1 --format=%ct ${branch}`, { cwd: tempDir });
+        return {
+            branch: branch.replace('origin/', ''), // Clean branch name for later use
+            timestamp: parseInt(stdout.trim())
+        };
+    }));
+    branchDates.sort((a, b) => b.timestamp - a.timestamp);
+    console.log(branchDates.slice(0, 5));
+    for (const { branch } of branchDates) {
+        try {
+            // Checkout the branch
+            await execAsync$1(`git checkout origin/${branch}`, { cwd: tempDir });
+            // Read and parse pluginInterfaceSupported.json
+            const content = await fs.readFile(`${tempDir}/pluginInterfaceSupported.json`, 'utf-8');
+            const { versions } = JSON.parse(content);
+            if (xyBranchesOnly && !branch.match(/^\d+\.\d+$/)) {
+                continue;
+            }
+            if (versions[0] === pluginInterfaceVersion) {
+                // Cleanup: Remove the temporary directory
+                await fs.rm(tempDir, { recursive: true, force: true });
+                return branch;
+            }
+        }
+        catch (e) {
+            continue;
+        }
+    }
+    await fs.rm(tempDir, { recursive: true, force: true });
+    throw new Error(`No matching branch found for ${plugin} with plugin interface version ${pluginInterfaceVersion}`);
+}
+async function runForPR() {
+    try {
+        const pluginInterfaceVersion = await getPluginInterfaceVersion();
+        const branches = {};
+        branches['plugin-interface'] = pluginInterfaceVersion;
+        const coreBranch = (await execAsync$1('git rev-parse --abbrev-ref HEAD')).stdout.trim();
+        const isCoreBranchXY = coreBranch.match(/^\d+\.\d+$/) !== null;
+        console.log(`Plugin matching running for core branch: ${coreBranch}, isXYBranch: ${isCoreBranchXY}\n\n`);
+        for (const plugin of PLUGINS) {
+            branches[plugin] = await getBranchForPlugin(plugin, pluginInterfaceVersion, isCoreBranchXY);
+        }
+        coreExports.setOutput('branches', JSON.stringify(branches));
+    }
+    catch (error) {
+        // Fail the workflow run if an error occurs
+        if (error instanceof Error)
+            coreExports.setFailed(error.message);
+    }
+}
+
+const execAsync = promisify(exec$1);
+async function getBranchForVersion(repo, version) {
+    console.log(`Processing ${repo}`);
+    const repoUrl = `https://github.com/${repo}.git`;
+    const tempDir = `./temp`;
     // Clone the repository
     await execAsync(`git clone ${repoUrl} ${tempDir}`);
     // Fetch all remote branches
@@ -27285,15 +27361,21 @@ async function getBranchForPlugin(plugin, pluginInterfaceVersion, xyBranchesOnly
         try {
             // Checkout the branch
             await execAsync(`git checkout origin/${branch}`, { cwd: tempDir });
-            // Read and parse pluginInterfaceSupported.json
-            const content = await fs.readFile(`${tempDir}/pluginInterfaceSupported.json`, 'utf-8');
-            const { versions } = JSON.parse(content);
-            if (xyBranchesOnly && !branch.match(/^\d+\.\d+$/)) {
+            // Read version from build.gradle
+            if (!branch.match(/^\d+\.\d+$/)) {
+                continue; // we only check x.y branches
+            }
+            const content = await fs.readFile(`${tempDir}/build.gradle`, 'utf-8');
+            const versionRegex = /version\s*=\s*['"]([^'"]+)['"]/;
+            const match = content.match(versionRegex);
+            if (!match) {
+                console.log(`No version found in ${branch}`);
                 continue;
             }
-            if (versions[0] === pluginInterfaceVersion) {
-                // Cleanup: Remove the temporary directory
-                await fs.rm(tempDir, { recursive: true, force: true });
+            const versionInFile = match[1];
+            console.log(`Found version ${versionInFile} in ${branch}`);
+            if (versionInFile === version) {
+                console.log(`Found matching branch: ${branch}`);
                 return branch;
             }
         }
@@ -27302,25 +27384,27 @@ async function getBranchForPlugin(plugin, pluginInterfaceVersion, xyBranchesOnly
         }
     }
     await fs.rm(tempDir, { recursive: true, force: true });
-    throw new Error(`No matching branch found for ${plugin} with plugin interface version ${pluginInterfaceVersion}`);
+    throw new Error(`No matching branch found for ${repo} with plugin interface version ${version}`);
 }
+async function runForAddDevTag() {
+    const coreVersion = coreExports.getInput('core-version');
+    const pluginInterfaceVersion = coreExports.getInput('plugin-interface-version');
+    const postgresqlPluginVersion = coreExports.getInput('postgresql-plugin-version');
+    const branches = {};
+    branches['core'] = await getBranchForVersion('supertokens/supertokens-core', coreVersion);
+    branches['plugin-interface'] = await getBranchForVersion('supertokens/supertokens-plugin-interface', pluginInterfaceVersion);
+    branches['postgresql'] = await getBranchForVersion('supertokens/supertokens-postgresql-plugin', postgresqlPluginVersion);
+    console.log(`Branches: ${JSON.stringify(branches, null, 2)}`);
+    coreExports.setOutput('branches', JSON.stringify(branches));
+}
+
 async function run() {
-    try {
-        const pluginInterfaceVersion = await getPluginInterfaceVersion();
-        const branches = {};
-        branches['plugin-interface'] = pluginInterfaceVersion;
-        const coreBranch = (await execAsync('git rev-parse --abbrev-ref HEAD')).stdout.trim();
-        const isCoreBranchXY = coreBranch.match(/^\d+\.\d+$/) !== null;
-        console.log(`Plugin matching running for core branch: ${coreBranch}, isXYBranch: ${isCoreBranchXY}\n\n`);
-        for (const plugin of PLUGINS) {
-            branches[plugin] = await getBranchForPlugin(plugin, pluginInterfaceVersion, isCoreBranchXY);
-        }
-        coreExports.setOutput('branches', JSON.stringify(branches));
+    const runFor = coreExports.getInput('run-for');
+    if (runFor.toLowerCase() === 'pr') {
+        await runForPR();
     }
-    catch (error) {
-        // Fail the workflow run if an error occurs
-        if (error instanceof Error)
-            coreExports.setFailed(error.message);
+    else if (runFor.toLowerCase() === 'add-dev-tag') {
+        await runForAddDevTag();
     }
 }
 

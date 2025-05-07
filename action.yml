@@ -8,6 +8,20 @@ branding:
   icon: heart
   color: red
 
+inputs:
+  run-for:
+    description: 'Specify what to run the action for'
+    required: true
+  core-version:
+    description: 'Core version'
+    required: false
+  plugin-interface-version:
+    description: 'Plugin interface version'
+    required: false
+  postgresql-plugin-version:
+    description: 'PostgreSQL plugin version'
+    required: false
+
 outputs:
   branches:
     description: Core dependency branches

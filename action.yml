@@ -25,6 +25,8 @@ inputs:
 outputs:
   branches:
     description: Core dependency branches
+  versions:
+    description: Core dependency versions
 
 runs:
   using: node20

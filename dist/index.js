@@ -27297,9 +27297,15 @@ async function getBranchForPlugin(plugin, pluginInterfaceVersion, xyBranchesOnly
                 continue;
             }
             if (versions[0] === pluginInterfaceVersion) {
+                let pluginVersion = '';
+                const gradleContent = await fs.readFile(`${tempDir}/build.gradle`, 'utf-8');
+                const versionMatch = gradleContent.match(/version = ['"](.+?)['"]/);
+                if (versionMatch) {
+                    pluginVersion = versionMatch[1];
+                }
                 // Cleanup: Remove the temporary directory
                 await fs.rm(tempDir, { recursive: true, force: true });
-                return branch;
+                return { branch, version: pluginVersion };
             }
         }
         catch (e) {
@@ -27311,7 +27317,7 @@ async function getBranchForPlugin(plugin, pluginInterfaceVersion, xyBranchesOnly
 }
 async function getBranchForPluginInterface(version, xyBranchesOnly) {
     if (!version.match(/^\d+\.\d+$/)) {
-        return version;
+        return { branch: version, version: '' }; // we don't care about the actual version here
     }
     const repoUrl = 'https://github.com/supertokens/supertokens-plugin-interface.git';
     const tempDir = './temp-plugin-interface';
@@ -27335,12 +27341,15 @@ async function getBranchForPluginInterface(version, xyBranchesOnly) {
     branchDates.sort((a, b) => b.timestamp - a.timestamp);
     for (const { branch } of branchDates) {
         try {
+            if (xyBranchesOnly && !branch.match(/^\d+\.\d+$/)) {
+                continue;
+            }
             await execAsync$1(`git checkout origin/${branch}`, { cwd: tempDir });
             const gradleFile = await fs.readFile(`${tempDir}/build.gradle`, 'utf-8');
             const versionMatch = gradleFile.match(/version = ['"](.+?)['"]/);
             if (versionMatch && versionMatch[1].startsWith(version + '.')) {
                 await fs.rm(tempDir, { recursive: true, force: true });
-                return branch;
+                return { branch, version: versionMatch[1] };
             }
         }
         catch (e) {
@@ -27354,14 +27363,32 @@ async function runForPR() {
     try {
         const pluginInterfaceVersion = await getPluginInterfaceVersion();
         const branches = {};
+        const versions = {
+            core: '',
+            'plugin-interface': '',
+            postgresql: ''
+            // not supporting anymore
+            // 'mysql': '',
+            // 'mongodb': ''
+        };
         const coreBranch = (await execAsync$1('git rev-parse --abbrev-ref HEAD')).stdout.trim();
         const isCoreBranchXY = coreBranch.match(/^\d+\.\d+$/) !== null;
-        branches['plugin-interface'] = await getBranchForPluginInterface(pluginInterfaceVersion, isCoreBranchXY);
+        const gradleFile = await fs.readFile('build.gradle', 'utf-8');
+        const versionMatch = gradleFile.match(/version = ['"](.+?)['"]/);
+        if (versionMatch) {
+            versions['core'] = versionMatch[1];
+        }
+        const piBranch = await getBranchForPluginInterface(pluginInterfaceVersion, isCoreBranchXY);
+        branches['plugin-interface'] = piBranch.branch;
+        versions['plugin-interface'] = piBranch.version;
         console.log(`Plugin matching running for core branch: ${coreBranch}, isXYBranch: ${isCoreBranchXY}\n\n`);
         for (const plugin of PLUGINS) {
-            branches[plugin] = await getBranchForPlugin(plugin, pluginInterfaceVersion, isCoreBranchXY);
+            const plVersion = await getBranchForPlugin(plugin, pluginInterfaceVersion, isCoreBranchXY);
+            branches[plugin] = plVersion.branch;
+            versions[plugin] = plVersion.version;
         }
         coreExports.setOutput('branches', JSON.stringify(branches));
+        coreExports.setOutput('versions', JSON.stringify(versions));
     }
     catch (error) {
         // Fail the workflow run if an error occurs

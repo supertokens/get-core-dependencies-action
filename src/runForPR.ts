@@ -215,6 +215,14 @@ export async function runForPR() {
       versions[plugin] = plVersion.version
     }
 
+    console.log(
+      `Branches: ${JSON.stringify(branches, null, 2)}\n\nVersions: ${JSON.stringify(
+        versions,
+        null,
+        2
+      )}`
+    )
+
     core.setOutput('branches', JSON.stringify(branches))
     core.setOutput('versions', JSON.stringify(versions))
   } catch (error) {

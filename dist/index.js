@@ -27375,6 +27375,7 @@ async function getBranchForVersion(repo, version) {
             const versionInFile = match[1];
             console.log(`Found version ${versionInFile} in ${branch}`);
             if (versionInFile === version) {
+                await fs.rm(tempDir, { recursive: true, force: true });
                 console.log(`Found matching branch: ${branch}`);
                 return branch;
             }

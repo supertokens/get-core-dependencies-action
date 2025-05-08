@@ -93,17 +93,81 @@ async function getBranchForPlugin(
   )
 }
 
+async function getBranchForPluginInterface(
+  version: string,
+  xyBranchesOnly: boolean
+): Promise<string> {
+  if (!version.match(/^\d+\.\d+$/)) {
+    return version
+  }
+
+  const repoUrl =
+    'https://github.com/supertokens/supertokens-plugin-interface.git'
+  const tempDir = './temp-plugin-interface'
+
+  // Clone the repository
+  await execAsync(`git clone ${repoUrl} ${tempDir}`)
+  await execAsync('git fetch --all', { cwd: tempDir })
+
+  const { stdout: branchesOutput } = await execAsync(
+    'git for-each-ref --format="%(refname:short)" refs/remotes/origin/',
+    { cwd: tempDir }
+  )
+
+  const remoteBranches = branchesOutput
+    .split('\n')
+    .map((b) => b.trim())
+    .filter((b) => b !== '' && b !== 'HEAD' && !b.includes('->'))
+
+  const branchDates = await Promise.all(
+    remoteBranches.map(async (branch) => {
+      const { stdout } = await execAsync(`git log -1 --format=%ct ${branch}`, {
+        cwd: tempDir
+      })
+      return {
+        branch: branch.replace('origin/', ''),
+        timestamp: parseInt(stdout.trim())
+      }
+    })
+  )
+
+  branchDates.sort((a, b) => b.timestamp - a.timestamp)
+
+  for (const { branch } of branchDates) {
+    try {
+      await execAsync(`git checkout origin/${branch}`, { cwd: tempDir })
+      const gradleFile = await fs.readFile(`${tempDir}/build.gradle`, 'utf-8')
+      const versionMatch = gradleFile.match(/version = ['"](.+?)['"]/)
+
+      if (versionMatch && versionMatch[1].startsWith(version + '.')) {
+        await fs.rm(tempDir, { recursive: true, force: true })
+        return branch
+      }
+    } catch (e) {
+      continue
+    }
+  }
+
+  await fs.rm(tempDir, { recursive: true, force: true })
+  throw new Error(
+    `No matching branch found for plugin-interface with version ${version}`
+  )
+}
+
 export async function runForPR() {
   try {
     const pluginInterfaceVersion = await getPluginInterfaceVersion()
     const branches: Record<string, string> = {}
 
-    branches['plugin-interface'] = pluginInterfaceVersion
-
     const coreBranch = (
       await execAsync('git rev-parse --abbrev-ref HEAD')
     ).stdout.trim()
     const isCoreBranchXY = coreBranch.match(/^\d+\.\d+$/) !== null
+
+    branches['plugin-interface'] = await getBranchForPluginInterface(
+      pluginInterfaceVersion,
+      isCoreBranchXY
+    )
 
     console.log(
       `Plugin matching running for core branch: ${coreBranch}, isXYBranch: ${isCoreBranchXY}\n\n`

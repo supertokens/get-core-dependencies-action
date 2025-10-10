@@ -20,6 +20,7 @@ async function getPluginInterfaceVersion() {
 }
 
 async function getBranchForPlugin(
+  coreBranch: string,
   plugin: string,
   pluginInterfaceVersion: string,
   xyBranchesOnly: boolean
@@ -42,6 +43,17 @@ async function getBranchForPlugin(
     .map((b) => b.trim())
     // Don't replace 'origin/' here since for-each-ref already gives clean names
     .filter((b) => b !== '' && b !== 'HEAD' && !b.includes('->'))
+
+  //if there is a branch with the same name as the core branch, return that one, regardless of versions
+  if (remoteBranches.includes(coreBranch)) {
+    await execAsync(`git checkout origin/${coreBranch}`, { cwd: tempDir })
+    const gradleFile = await fs.readFile(`${tempDir}/build.gradle`, 'utf-8')
+    const versionMatch = gradleFile.match(/version = ['"](.+?)['"]/)
+    console.log(
+      `Branch with name ${coreBranch} found with version ${versionMatch[1]}. Returning that branch.`
+    )
+    return { coreBranch, version: versionMatch[1] }
+  }
 
   // Sort branches by commit date
   const branchDates = await Promise.all(
@@ -104,6 +116,7 @@ async function getBranchForPlugin(
 }
 
 async function getBranchForPluginInterface(
+  coreBranch: string,
   version: string,
   xyBranchesOnly: boolean
 ): Promise<{ branch: string; version: string }> {
@@ -128,6 +141,17 @@ async function getBranchForPluginInterface(
     .split('\n')
     .map((b) => b.trim())
     .filter((b) => b !== '' && b !== 'HEAD' && !b.includes('->'))
+
+  //if there is a branch with the same name as the core branch, return that one, regardless of versions
+  if (remoteBranches.includes(coreBranch)) {
+    await execAsync(`git checkout origin/${coreBranch}`, { cwd: tempDir })
+    const gradleFile = await fs.readFile(`${tempDir}/build.gradle`, 'utf-8')
+    const versionMatch = gradleFile.match(/version = ['"](.+?)['"]/)
+    console.log(
+      `Branch with name ${coreBranch} found with version ${versionMatch[1]}. Returning that branch.`
+    )
+    return { coreBranch, version: versionMatch[1] }
+  }
 
   const branchDates = await Promise.all(
     remoteBranches.map(async (branch) => {
@@ -194,6 +218,7 @@ export async function runForPR() {
     }
 
     const piBranch = await getBranchForPluginInterface(
+      coreBranch,
       pluginInterfaceVersion,
       isCoreBranchXY
     )
@@ -207,6 +232,7 @@ export async function runForPR() {
 
     for (const plugin of PLUGINS) {
       const plVersion = await getBranchForPlugin(
+        coreBranch,
         plugin,
         pluginInterfaceVersion,
         isCoreBranchXY

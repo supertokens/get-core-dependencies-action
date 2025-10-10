@@ -27259,7 +27259,7 @@ async function getPluginInterfaceVersion() {
     const pluginVersions = JSON.parse(commonFile);
     return pluginVersions.versions[0];
 }
-async function getBranchForPlugin(plugin, pluginInterfaceVersion, xyBranchesOnly) {
+async function getBranchForPlugin(coreBranch, plugin, pluginInterfaceVersion, xyBranchesOnly) {
     console.log(`Processing ${plugin}`);
     const repoUrl = `https://github.com/supertokens/supertokens-${plugin}-plugin.git`;
     const tempDir = `./temp-${plugin}`;
@@ -27274,6 +27274,14 @@ async function getBranchForPlugin(plugin, pluginInterfaceVersion, xyBranchesOnly
         .map((b) => b.trim())
         // Don't replace 'origin/' here since for-each-ref already gives clean names
         .filter((b) => b !== '' && b !== 'HEAD' && !b.includes('->'));
+    //if there is a branch with the same name as the core branch, return that one, regardless of versions
+    if (remoteBranches.includes(coreBranch)) {
+        await execAsync$1(`git checkout origin/${coreBranch}`, { cwd: tempDir });
+        const gradleFile = await fs.readFile(`${tempDir}/build.gradle`, 'utf-8');
+        const versionMatch = gradleFile.match(/version = ['"](.+?)['"]/);
+        console.log(`Branch with name ${coreBranch} found with version ${versionMatch[1]}. Returning that branch.`);
+        return { coreBranch, version: versionMatch[1] };
+    }
     // Sort branches by commit date
     const branchDates = await Promise.all(remoteBranches.map(async (branch) => {
         const { stdout } = await execAsync$1(
@@ -27315,7 +27323,7 @@ async function getBranchForPlugin(plugin, pluginInterfaceVersion, xyBranchesOnly
     await fs.rm(tempDir, { recursive: true, force: true });
     throw new Error(`No matching branch found for ${plugin} with plugin interface version ${pluginInterfaceVersion}`);
 }
-async function getBranchForPluginInterface(version, xyBranchesOnly) {
+async function getBranchForPluginInterface(coreBranch, version, xyBranchesOnly) {
     if (!version.match(/^\d+\.\d+$/)) {
         return { branch: version, version: '' }; // we don't care about the actual version here
     }
@@ -27329,6 +27337,14 @@ async function getBranchForPluginInterface(version, xyBranchesOnly) {
         .split('\n')
         .map((b) => b.trim())
         .filter((b) => b !== '' && b !== 'HEAD' && !b.includes('->'));
+    //if there is a branch with the same name as the core branch, return that one, regardless of versions
+    if (remoteBranches.includes(coreBranch)) {
+        await execAsync$1(`git checkout origin/${coreBranch}`, { cwd: tempDir });
+        const gradleFile = await fs.readFile(`${tempDir}/build.gradle`, 'utf-8');
+        const versionMatch = gradleFile.match(/version = ['"](.+?)['"]/);
+        console.log(`Branch with name ${coreBranch} found with version ${versionMatch[1]}. Returning that branch.`);
+        return { coreBranch, version: versionMatch[1] };
+    }
     const branchDates = await Promise.all(remoteBranches.map(async (branch) => {
         const { stdout } = await execAsync$1(`git log -1 --format=%ct ${branch}`, {
             cwd: tempDir
@@ -27359,7 +27375,7 @@ async function getBranchForPluginInterface(version, xyBranchesOnly) {
     await fs.rm(tempDir, { recursive: true, force: true });
     throw new Error(`No matching branch found for plugin-interface with version ${version}`);
 }
-async function runForPR() {
+async function runForPR(coreBranch) {
     try {
         const pluginInterfaceVersion = await getPluginInterfaceVersion();
         const branches = {};
@@ -27371,23 +27387,25 @@ async function runForPR() {
             // 'mysql': '',
             // 'mongodb': ''
         };
-        const coreBranch = (await execAsync$1('git rev-parse --abbrev-ref HEAD')).stdout.trim();
+        if (coreBranch === undefined) {
+            coreBranch = (await execAsync$1('git rev-parse --abbrev-ref HEAD')).stdout.trim();
+        }
         const isCoreBranchXY = coreBranch.match(/^\d+\.\d+$/) !== null;
         const gradleFile = await fs.readFile('build.gradle', 'utf-8');
         const versionMatch = gradleFile.match(/version = ['"](.+?)['"]/);
         if (versionMatch) {
             versions['core'] = versionMatch[1];
         }
-        const piBranch = await getBranchForPluginInterface(pluginInterfaceVersion, isCoreBranchXY);
+        const piBranch = await getBranchForPluginInterface(coreBranch, pluginInterfaceVersion, isCoreBranchXY);
         branches['plugin-interface'] = piBranch.branch;
         versions['plugin-interface'] = piBranch.version;
         console.log(`Plugin matching running for core branch: ${coreBranch}, isXYBranch: ${isCoreBranchXY}\n\n`);
         for (const plugin of PLUGINS) {
-            const plVersion = await getBranchForPlugin(plugin, pluginInterfaceVersion, isCoreBranchXY);
+            const plVersion = await getBranchForPlugin(coreBranch, plugin, pluginInterfaceVersion, isCoreBranchXY);
             branches[plugin] = plVersion.branch;
             versions[plugin] = plVersion.version;
         }
-        console.log(`Branches: ${JSON.stringify(branches, null, 2)}\n\nVersions: ${JSON.stringify(versions, null, 2)}`);
+        console.log(`Selected Branches: ${JSON.stringify(branches, null, 2)}\n\nVersions: ${JSON.stringify(versions, null, 2)}`);
         coreExports.setOutput('branches', JSON.stringify(branches));
         coreExports.setOutput('versions', JSON.stringify(versions));
     }
@@ -27471,7 +27489,9 @@ async function runForAddDevTag() {
 async function run() {
     const runFor = coreExports.getInput('run-for');
     if (runFor.toLowerCase() === 'pr') {
-        await runForPR();
+        const coreBranch = coreExports.getInput('core-branch');
+        console.log(`Running action for pr with coreBranch: ${coreBranch}`);
+        await runForPR(coreBranch);
     }
     else if (runFor.toLowerCase() === 'add-dev-tag') {
         await runForAddDevTag();

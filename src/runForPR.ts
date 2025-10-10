@@ -242,7 +242,7 @@ export async function runForPR() {
     }
 
     console.log(
-      `Branches: ${JSON.stringify(branches, null, 2)}\n\nVersions: ${JSON.stringify(
+      `Selected Branches: ${JSON.stringify(branches, null, 2)}\n\nVersions: ${JSON.stringify(
         versions,
         null,
         2

@@ -27275,7 +27275,7 @@ async function getBranchForPlugin(coreBranch, plugin, pluginInterfaceVersion, xy
         // Don't replace 'origin/' here since for-each-ref already gives clean names
         .filter((b) => b !== '' && b !== 'HEAD' && !b.includes('->'));
     //if there is a branch with the same name as the core branch, return that one, regardless of versions
-    if (remoteBranches.includes(coreBranch)) {
+    if (remoteBranches.includes(`origin/${coreBranch}`)) {
         await execAsync$1(`git checkout origin/${coreBranch}`, { cwd: tempDir });
         const gradleFile = await fs.readFile(`${tempDir}/build.gradle`, 'utf-8');
         const versionMatch = gradleFile.match(/version = ['"](.+?)['"]/);
@@ -27338,7 +27338,7 @@ async function getBranchForPluginInterface(coreBranch, version, xyBranchesOnly) 
         .map((b) => b.trim())
         .filter((b) => b !== '' && b !== 'HEAD' && !b.includes('->'));
     //if there is a branch with the same name as the core branch, return that one, regardless of versions
-    if (remoteBranches.includes(coreBranch)) {
+    if (remoteBranches.includes(`origin/${coreBranch}`)) {
         await execAsync$1(`git checkout origin/${coreBranch}`, { cwd: tempDir });
         const gradleFile = await fs.readFile(`${tempDir}/build.gradle`, 'utf-8');
         const versionMatch = gradleFile.match(/version = ['"](.+?)['"]/);

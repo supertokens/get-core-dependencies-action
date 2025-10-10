@@ -45,7 +45,7 @@ async function getBranchForPlugin(
     .filter((b) => b !== '' && b !== 'HEAD' && !b.includes('->'))
 
   //if there is a branch with the same name as the core branch, return that one, regardless of versions
-  if (remoteBranches.includes(coreBranch)) {
+  if (remoteBranches.includes(`origin/${coreBranch}`)) {
     await execAsync(`git checkout origin/${coreBranch}`, { cwd: tempDir })
     const gradleFile = await fs.readFile(`${tempDir}/build.gradle`, 'utf-8')
     const versionMatch = gradleFile.match(/version = ['"](.+?)['"]/)
@@ -143,7 +143,7 @@ async function getBranchForPluginInterface(
     .filter((b) => b !== '' && b !== 'HEAD' && !b.includes('->'))
 
   //if there is a branch with the same name as the core branch, return that one, regardless of versions
-  if (remoteBranches.includes(coreBranch)) {
+ if (remoteBranches.includes(`origin/${coreBranch}`)) {
     await execAsync(`git checkout origin/${coreBranch}`, { cwd: tempDir })
     const gradleFile = await fs.readFile(`${tempDir}/build.gradle`, 'utf-8')
     const versionMatch = gradleFile.match(/version = ['"](.+?)['"]/)

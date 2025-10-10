@@ -27279,8 +27279,13 @@ async function getBranchForPlugin(coreBranch, plugin, pluginInterfaceVersion, xy
         await execAsync$1(`git checkout origin/${coreBranch}`, { cwd: tempDir });
         const gradleFile = await fs.readFile(`${tempDir}/build.gradle`, 'utf-8');
         const versionMatch = gradleFile.match(/version = ['"](.+?)['"]/);
-        console.log(`Branch with name ${coreBranch} found with version ${versionMatch[1]}. Returning that branch.`);
-        return { coreBranch, version: versionMatch[1] };
+        let pluginVersion = '';
+        if (versionMatch) {
+            pluginVersion = versionMatch[1];
+        }
+        console.log(`Branch with name ${coreBranch} found with version ${pluginVersion}. Returning that branch.`);
+        await fs.rm(tempDir, { recursive: true, force: true });
+        return { branch: coreBranch, version: pluginVersion };
     }
     // Sort branches by commit date
     const branchDates = await Promise.all(remoteBranches.map(async (branch) => {
@@ -27342,8 +27347,13 @@ async function getBranchForPluginInterface(coreBranch, version, xyBranchesOnly) 
         await execAsync$1(`git checkout origin/${coreBranch}`, { cwd: tempDir });
         const gradleFile = await fs.readFile(`${tempDir}/build.gradle`, 'utf-8');
         const versionMatch = gradleFile.match(/version = ['"](.+?)['"]/);
-        console.log(`Branch with name ${coreBranch} found with version ${versionMatch[1]}. Returning that branch.`);
-        return { coreBranch, version: versionMatch[1] };
+        let pluginVersion = '';
+        if (versionMatch) {
+            pluginVersion = versionMatch[1];
+        }
+        console.log(`Branch with name ${coreBranch} found with version ${pluginVersion}. Returning that branch.`);
+        await fs.rm(tempDir, { recursive: true, force: true });
+        return { branch: coreBranch, version: pluginVersion };
     }
     const branchDates = await Promise.all(remoteBranches.map(async (branch) => {
         const { stdout } = await execAsync$1(`git log -1 --format=%ct ${branch}`, {

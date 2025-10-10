@@ -49,10 +49,15 @@ async function getBranchForPlugin(
     await execAsync(`git checkout origin/${coreBranch}`, { cwd: tempDir })
     const gradleFile = await fs.readFile(`${tempDir}/build.gradle`, 'utf-8')
     const versionMatch = gradleFile.match(/version = ['"](.+?)['"]/)
+    let pluginVersion = ''
+    if (versionMatch) {
+      pluginVersion = versionMatch[1]
+    }
     console.log(
-      `Branch with name ${coreBranch} found with version ${versionMatch[1]}. Returning that branch.`
+      `Branch with name ${coreBranch} found with version ${pluginVersion}. Returning that branch.`
     )
-    return { coreBranch, version: versionMatch[1] }
+    await fs.rm(tempDir, { recursive: true, force: true })
+    return { branch: coreBranch, version: pluginVersion }
   }
 
   // Sort branches by commit date
@@ -143,14 +148,19 @@ async function getBranchForPluginInterface(
     .filter((b) => b !== '' && b !== 'HEAD' && !b.includes('->'))
 
   //if there is a branch with the same name as the core branch, return that one, regardless of versions
- if (remoteBranches.includes(`origin/${coreBranch}`)) {
+  if (remoteBranches.includes(`origin/${coreBranch}`)) {
     await execAsync(`git checkout origin/${coreBranch}`, { cwd: tempDir })
     const gradleFile = await fs.readFile(`${tempDir}/build.gradle`, 'utf-8')
     const versionMatch = gradleFile.match(/version = ['"](.+?)['"]/)
+    let pluginVersion = ''
+    if (versionMatch) {
+      pluginVersion = versionMatch[1]
+    }
     console.log(
-      `Branch with name ${coreBranch} found with version ${versionMatch[1]}. Returning that branch.`
+      `Branch with name ${coreBranch} found with version ${pluginVersion}. Returning that branch.`
     )
-    return { coreBranch, version: versionMatch[1] }
+    await fs.rm(tempDir, { recursive: true, force: true })
+    return { branch: coreBranch, version: pluginVersion }
   }
 
   const branchDates = await Promise.all(

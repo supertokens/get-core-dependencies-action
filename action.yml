@@ -21,6 +21,9 @@ inputs:
   postgresql-plugin-version:
     description: 'PostgreSQL plugin version'
     required: false
+  core-branch:
+    description: 'The name of the core branch you are running this action for'
+    required: false
 
 outputs:
   branches:

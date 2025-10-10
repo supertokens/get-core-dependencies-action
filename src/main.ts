@@ -5,7 +5,8 @@ import { runForAddDevTag } from './runForAddDevTag.js'
 export async function run(): Promise<void> {
   const runFor = core.getInput('run-for')
   if (runFor.toLowerCase() === 'pr') {
-    await runForPR()
+    const coreBranch = core.getInput('core-branch')
+    await runForPR(coreBranch)
   } else if (runFor.toLowerCase() === 'add-dev-tag') {
     await runForAddDevTag()
   }

@@ -192,7 +192,7 @@ async function getBranchForPluginInterface(
   )
 }
 
-export async function runForPR() {
+export async function runForPR(coreBranch: string | undefined) {
   try {
     const pluginInterfaceVersion = await getPluginInterfaceVersion()
     const branches: Record<string, string> = {}
@@ -206,9 +206,11 @@ export async function runForPR() {
       // 'mongodb': ''
     }
 
-    const coreBranch = (
-      await execAsync('git rev-parse --abbrev-ref HEAD')
-    ).stdout.trim()
+    if (coreBranch === undefined) {
+      coreBranch = (
+        await execAsync('git rev-parse --abbrev-ref HEAD')
+      ).stdout.trim()
+    }
     const isCoreBranchXY = coreBranch.match(/^\d+\.\d+$/) !== null
 
     const gradleFile = await fs.readFile('build.gradle', 'utf-8')

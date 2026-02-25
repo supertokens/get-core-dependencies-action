@@ -78,22 +78,16 @@ async function getBranchForPlugin(
   branchDates.sort((a, b) => b.timestamp - a.timestamp)
   console.log(branchDates.slice(0, 5))
 
+  // First pass: prefer X.Y released branches (stable, deterministic)
   for (const { branch } of branchDates) {
+    if (!branch.match(/^\d+\.\d+$/)) continue
     try {
-      // Checkout the branch
       await execAsync(`git checkout origin/${branch}`, { cwd: tempDir })
-
-      // Read and parse pluginInterfaceSupported.json
       const content = await fs.readFile(
         `${tempDir}/pluginInterfaceSupported.json`,
         'utf-8'
       )
       const { versions } = JSON.parse(content)
-
-      if (xyBranchesOnly && !branch.match(/^\d+\.\d+$/)) {
-        continue
-      }
-
       if (versions[0] === pluginInterfaceVersion) {
         let pluginVersion = ''
         const gradleContent = await fs.readFile(
@@ -104,13 +98,41 @@ async function getBranchForPlugin(
         if (versionMatch) {
           pluginVersion = versionMatch[1]
         }
-
-        // Cleanup: Remove the temporary directory
         await fs.rm(tempDir, { recursive: true, force: true })
         return { branch, version: pluginVersion }
       }
     } catch (e) {
       continue
+    }
+  }
+
+  // Second pass: try non-X.Y branches, but only when not restricted to released branches
+  if (!xyBranchesOnly) {
+    for (const { branch } of branchDates) {
+      if (branch.match(/^\d+\.\d+$/)) continue // already tried above
+      try {
+        await execAsync(`git checkout origin/${branch}`, { cwd: tempDir })
+        const content = await fs.readFile(
+          `${tempDir}/pluginInterfaceSupported.json`,
+          'utf-8'
+        )
+        const { versions } = JSON.parse(content)
+        if (versions[0] === pluginInterfaceVersion) {
+          let pluginVersion = ''
+          const gradleContent = await fs.readFile(
+            `${tempDir}/build.gradle`,
+            'utf-8'
+          )
+          const versionMatch = gradleContent.match(/version = ['"](.+?)['"]/)
+          if (versionMatch) {
+            pluginVersion = versionMatch[1]
+          }
+          await fs.rm(tempDir, { recursive: true, force: true })
+          return { branch, version: pluginVersion }
+        }
+      } catch (e) {
+        continue
+      }
     }
   }
 
@@ -177,22 +199,40 @@ async function getBranchForPluginInterface(
 
   branchDates.sort((a, b) => b.timestamp - a.timestamp)
 
+  // First pass: prefer X.Y released branches (stable, deterministic)
   for (const { branch } of branchDates) {
+    if (!branch.match(/^\d+\.\d+$/)) continue
     try {
-      if (xyBranchesOnly && !branch.match(/^\d+\.\d+$/)) {
-        continue
-      }
-
       await execAsync(`git checkout origin/${branch}`, { cwd: tempDir })
       const gradleFile = await fs.readFile(`${tempDir}/build.gradle`, 'utf-8')
       const versionMatch = gradleFile.match(/version = ['"](.+?)['"]/)
-
       if (versionMatch && versionMatch[1].startsWith(version + '.')) {
         await fs.rm(tempDir, { recursive: true, force: true })
         return { branch, version: versionMatch[1] }
       }
     } catch (e) {
       continue
+    }
+  }
+
+  // Second pass: try non-X.Y branches, but only when not restricted to released branches
+  if (!xyBranchesOnly) {
+    for (const { branch } of branchDates) {
+      if (branch.match(/^\d+\.\d+$/)) continue // already tried above
+      try {
+        await execAsync(`git checkout origin/${branch}`, { cwd: tempDir })
+        const gradleFile = await fs.readFile(
+          `${tempDir}/build.gradle`,
+          'utf-8'
+        )
+        const versionMatch = gradleFile.match(/version = ['"](.+?)['"]/)
+        if (versionMatch && versionMatch[1].startsWith(version + '.')) {
+          await fs.rm(tempDir, { recursive: true, force: true })
+          return { branch, version: versionMatch[1] }
+        }
+      } catch (e) {
+        continue
+      }
     }
   }
 

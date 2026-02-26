@@ -221,10 +221,7 @@ async function getBranchForPluginInterface(
       if (branch.match(/^\d+\.\d+$/)) continue // already tried above
       try {
         await execAsync(`git checkout origin/${branch}`, { cwd: tempDir })
-        const gradleFile = await fs.readFile(
-          `${tempDir}/build.gradle`,
-          'utf-8'
-        )
+        const gradleFile = await fs.readFile(`${tempDir}/build.gradle`, 'utf-8')
         const versionMatch = gradleFile.match(/version = ['"](.+?)['"]/)
         if (versionMatch && versionMatch[1].startsWith(version + '.')) {
           await fs.rm(tempDir, { recursive: true, force: true })

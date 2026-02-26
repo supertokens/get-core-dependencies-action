@@ -27540,7 +27540,8 @@ async function runForAddDevTag() {
 async function run() {
     const runFor = coreExports.getInput('run-for');
     if (runFor.toLowerCase() === 'pr') {
-        const coreBranch = coreExports.getInput('core-branch');
+        const coreBranchInput = coreExports.getInput('core-branch');
+        const coreBranch = coreBranchInput || undefined;
         console.log(`Running action for pr with coreBranch: ${coreBranch}`);
         await runForPR(coreBranch);
     }

@@ -7,7 +7,9 @@ export async function run(): Promise<void> {
   if (runFor.toLowerCase() === 'pr') {
     const coreBranchInput = core.getInput('core-branch')
     const coreBranch = coreBranchInput || undefined
-    console.log(`Running action for pr with coreBranch: ${coreBranch}`)
+    console.log(
+      `Running action for pr with coreBranch: ${coreBranch ?? 'not provided, will resolve from environment'}`
+    )
     await runForPR(coreBranch)
   } else if (runFor.toLowerCase() === 'add-dev-tag') {
     await runForAddDevTag()

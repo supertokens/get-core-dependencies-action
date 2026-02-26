@@ -27439,7 +27439,9 @@ async function runForPR(coreBranch) {
             // 'mongodb': ''
         };
         if (coreBranch === undefined) {
-            coreBranch = (await execAsync$1('git rev-parse --abbrev-ref HEAD')).stdout.trim();
+            coreBranch =
+                process.env.GITHUB_HEAD_REF ||
+                    (await execAsync$1('git rev-parse --abbrev-ref HEAD')).stdout.trim();
         }
         const isCoreBranchXY = coreBranch.match(/^\d+\.\d+$/) !== null;
         const gradleFile = await fs.readFile('build.gradle', 'utf-8');

@@ -254,9 +254,9 @@ export async function runForPR(coreBranch: string | undefined) {
     }
 
     if (coreBranch === undefined) {
-      coreBranch = (
-        await execAsync('git rev-parse --abbrev-ref HEAD')
-      ).stdout.trim()
+      coreBranch =
+        process.env.GITHUB_HEAD_REF ||
+        (await execAsync('git rev-parse --abbrev-ref HEAD')).stdout.trim()
     }
     const isCoreBranchXY = coreBranch.match(/^\d+\.\d+$/) !== null
 
